@@ -23,34 +23,39 @@ import re
 
 
 TIMEOUT = 3
-PARALLELISM = 100
-h_in, p_in = sys.argv[1], sys.argv[2:]
+PARALLELISM = 512
 hosts = []
 ports = []
 res = []
 active = {}
 
 
-for pp in p_in:
-    for p in pp.split():
-        if '-' in p:
-            a, b = p.split('-', 1)
-            ports += range(int(a), int(b) + 1)
-        else:
-            ports += [int(p)]
+for x in sys.argv[1:]:
+    if x.isdigit():
+        ports += [int(x)]
+    elif x.replace('-', '').isdigit():
+        a, b = x.split('-', 1)
+        ports += range(int(a), int(b) + 1)
+    else:
+        m = re.match(r'^(\d+\.\d+\.\d+\.)(\d+|(\d+)-(\d+)|\*)$', x)
+        if m.group(2).isdigit():
+            a = int(m.group(2))
+            b = a + 1
+        elif m.group(3):
+            a = int(m.group(3))
+            b = int(m.group(4)) + 1
+        elif m.group(2) == '*':
+            a = 0
+            b = 256
+        for d in range(a, b):
+            hosts.append(m.group(1) + str(d))
 
-for h in h_in.split():
-    m = re.match(r'^(\d+\.\d+\.\d+\.)(\d+)-(\d+)$', h)
-    if m:
-        for i in xrange(int(m.group(2)), int(m.group(3)) + 1):
-            hosts.append(m.group(1) + str(i))
-        continue
-    m = re.match(r'^(\d+\.\d+\.\d+\.)\*$', h)
-    if m:
-        for i in xrange(1, 255):
-            hosts.append(m.group(1) + str(i))
-        continue
-    hosts.append(h)
+
+def _laddr(s):
+    try:
+        return s.getsockname()
+    except:
+        return 'nolocalip'
 
 
 def process(res):
@@ -60,23 +65,30 @@ def process(res):
         try:
             s.connect(a)
         except error, e:
+            _la = _laddr(s)
             if 'progress' in str(e):
                 if time.time() - t < TIMEOUT:
                     cont = 1
                 else:
-                    res.append((a, 'filtered'))
-            elif 'refused' in str(e):
-                res.append((a, 'closed'))
-            elif 'timed out' in str(e):
-                res.append((a, 'filtered'))
+                    res.append((_la, a, 'filtered'))
+            elif 'refused' in str(e).lower():
+                res.append((_la, a, 'closed'))
+            elif 'timed out' in str(e).lower():
+                res.append((_la, a, 'filtered'))
             else:
-                raise
+                m = re.match(r'.*[^\w\s]([\w\s]+)[^\w]*$', str(e))
+                if m:
+                    err = m.group(1).lower().strip().replace(' ', '-')
+                    res.append((_la, a, err))
+                else:
+                    raise
         else:
-            res.append((a, 'open'))
+            res.append((_laddr(s), a, 'open'))
         if not cont:
             s.close()
             del active[a]
     time.sleep(0.1)
+
 
 for h in hosts:
     for p in ports:
@@ -92,5 +104,7 @@ for h in hosts:
 while active:
     process(res)
 
-for r in sorted(res, key=lambda t: (t[0][1], t[0][0])):
-    print r[0][0], r[0][1], r[1]
+
+for r in sorted(res, key=lambda t: (t[1][0], t[1][1])):
+    #print r[0][0], r[0][1], '->', r[1][0], r[1][1], r[2]
+    print r[0][0], '->', r[1][0], r[1][1], r[2]
