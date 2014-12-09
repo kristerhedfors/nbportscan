@@ -11,6 +11,10 @@
 # $ fab -H hosta,hostb,hostc list_open_ports > ports.txt
 # $ plist="`grep out:.. ports.txt | cut -d' ' -f4 | sort -nu | tr '\n' ' '`"
 # $ fab -H hosta,hostb,hostc portscan:"hosta hostb hostc $plist"
+#
+# You can also compare the results of two extensive portscans between various
+# src and dst addresses using the regular `diff` command.
+#
 
 import zlib
 
