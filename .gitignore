@@ -1,0 +1,14 @@
+*.py[cod]
+*.sw?
+*~
+.DS_Store
+.bundle
+.ropeproject
+Gemfile.lock
+VimFlavor.lock
+_
+build
+tags
+test.py
+todo.txt
+vendor
